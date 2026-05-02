@@ -1,0 +1,39 @@
+{
+    "name": "livemail-classifier",
+    "version": "1.0.0",
+    "description": "LiveMail Classifier - Real-time email categorization with Gmail API and NLP",
+    "private": true,
+    "scripts": {
+        "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+        "server": "cd server && npm start",
+        "server:dev": "cd server && npm run dev",
+        "server:seed": "cd server && npm run seed",
+        "client": "cd client && npm start",
+        "build": "cd client && npm run build",
+        "dev": "concurrently \"npm run server:dev\" \"npm run client\"",
+        "dev:server": "cd server && npm run dev",
+        "dev:client": "cd client && npm start"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    },
+    "keywords": [
+        "email",
+        "classifier",
+        "nlp",
+        "gmail",
+        "mongodb",
+        "react",
+        "socket.io"
+    ],
+    "author": "LiveMail Team",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Nandu-2550/CivicLink_9kis-2026.git"
+    },
+    "engines": {
+        "node": ">=18.0.0",
+        "npm": ">=9.0.0"
+    }
+}
