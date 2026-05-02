@@ -9,6 +9,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const { initializeClassifier, loadClassifier, isTrained } = require('./classifier/classifier');
 const { pollAndProcessEmails } = require('./services/gmailService');
@@ -45,6 +46,17 @@ app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
     next();
 });
+
+// Apply rate limiting to all API routes
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again after 15 minutes'
+});
+
+app.use('/api', apiLimiter);
 
 // Routes
 app.use('/api/emails', emailRoutes);

@@ -43,8 +43,9 @@ const EmailSchema = new mongoose.Schema({
     // Classification results
     category: {
         type: String,
-        enum: ['Personal', 'Business', 'Finance', 'Security', 'Work', 'College/School', 'Promotion'],
-        required: true
+        enum: ['Personal', 'Business', 'Finance', 'Security', 'Work', 'College/School', 'Promotion', 'Uncategorized'],
+        required: true,
+        default: 'Uncategorized'
     },
     confidence: {
         type: Number,

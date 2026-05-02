@@ -93,10 +93,10 @@ const fetchMessageDetails = async (messageId) => {
         const rawMessage = response.data.raw;
 
         // Decode the base64url encoded message
-        const decodedMessage = Buffer.from(rawMessage, 'base64url').toString('utf-8');
+        const messageBuffer = Buffer.from(rawMessage, 'base64url');
 
         // Parse the MIME message
-        const parsed = await simpleParser(decodedMessage);
+        const parsed = await simpleParser(messageBuffer);
 
         // Extract email content for classification
         const emailContent = [

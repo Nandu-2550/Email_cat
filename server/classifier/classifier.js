@@ -11,7 +11,8 @@ const CATEGORIES = {
     SECURITY: 'Security',
     WORK: 'Work',
     EDUCATION: 'College/School',
-    PROMOTION: 'Promotion'
+    PROMOTION: 'Promotion',
+    UNCATEGORIZED: 'Uncategorized'
 };
 
 /**
@@ -48,9 +49,9 @@ const classifyEmail = (text) => {
     if (!classifier) {
         console.warn('Classifier not initialized, returning default category');
         return {
-            category: CATEGORIES.PERSONAL,
+            category: CATEGORIES.UNCATEGORIZED,
             confidence: 0,
-            allClassifications: []
+            allClassifications: [{ label: CATEGORIES.UNCATEGORIZED, value: 1 }]
         };
     }
 
@@ -62,9 +63,9 @@ const classifyEmail = (text) => {
 
     if (!category || category.length === 0) {
         return {
-            category: CATEGORIES.PERSONAL,
+            category: CATEGORIES.UNCATEGORIZED,
             confidence: 0,
-            allClassifications: []
+            allClassifications: [{ label: CATEGORIES.UNCATEGORIZED, value: 1 }]
         };
     }
 
