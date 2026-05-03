@@ -1,7 +1,8 @@
 const { google } = require('googleapis');
 const { simpleParser } = require('mailparser');
 const Email = require('../models/Email');
-const { classifyEmail } = require('../classifier/classifier');
+const { classifyEmail } = require('./classifier');
+const { getOAuth2Client } = require('../config/googleAuth');
 
 // Gmail API scopes
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
@@ -14,22 +15,12 @@ let gmail = null;
  * Initialize the Gmail API client
  */
 const initializeGmailClient = () => {
-    const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = process.env;
+    oauth2Client = getOAuth2Client();
 
-    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
+    if (!oauth2Client) {
         console.warn('Gmail API credentials not configured. Running in demo mode.');
         return false;
     }
-
-    oauth2Client = new google.auth.OAuth2(
-        GOOGLE_CLIENT_ID,
-        GOOGLE_CLIENT_SECRET,
-        'postmessage'
-    );
-
-    oauth2Client.setCredentials({
-        refresh_token: GOOGLE_REFRESH_TOKEN
-    });
 
     gmail = google.gmail({ version: 'v1', auth: oauth2Client });
     console.log('Gmail API client initialized');

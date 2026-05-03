@@ -1,4 +1,7 @@
 const natural = require('natural');
+const path = require('path');
+
+const CLASSIFIER_PATH = path.join(__dirname, '..', 'data', 'classifier.json');
 
 // Bayes classifier instance
 let classifier = null;
@@ -114,7 +117,7 @@ const isTrained = () => {
 /**
  * Save classifier to a file (optional persistence)
  */
-const saveClassifier = async (filename = './classifier/classifier.json') => {
+const saveClassifier = async (filename = CLASSIFIER_PATH) => {
     if (!classifier) return false;
 
     try {
@@ -138,7 +141,7 @@ const saveClassifier = async (filename = './classifier/classifier.json') => {
 /**
  * Load classifier from a file (optional persistence)
  */
-const loadClassifier = async (filename = './classifier/classifier.json') => {
+const loadClassifier = async (filename = CLASSIFIER_PATH) => {
     try {
         return new Promise((resolve, reject) => {
             natural.BayesClassifier.load(filename, null, (err, loadedClassifier) => {

@@ -11,7 +11,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
-const { initializeClassifier, loadClassifier, isTrained } = require('./classifier/classifier');
+const { initializeClassifier, loadClassifier, isTrained } = require('./services/classifier');
 const { pollAndProcessEmails } = require('./services/gmailService');
 const emailRoutes = require('./routes/emailRoutes');
 

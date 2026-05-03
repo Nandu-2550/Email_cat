@@ -1,37 +1,26 @@
-# Root level ignores
-
 # Dependencies
 node_modules/
+/client/node_modules
+/server/node_modules
 
-# Environment variables
+# Environment Variables
 .env
-.env.local
-.env.*.local
+server/.env
+client/.env
 
-# Build outputs
-build/
-dist/
-*.log
+# Production Build
+/client/build
+/client/dist
+/dist
 
-# IDE
+# IDE/System Files
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# OS
 .DS_Store
+*.log
+npm-debug.log*
+
+# OS Files
 Thumbs.db
-
-# Coverage
-coverage/
-
-# Uploads
-uploads/
-
-# Cache
-.cache/
-
-# Temporary files
-*.tmp
-*.temp
+ehthumbs.db
+Desktop.ini

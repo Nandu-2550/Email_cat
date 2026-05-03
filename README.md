@@ -128,16 +128,18 @@ Email catagariser/
 │   └── postcss.config.js
 │
 ├── server/                    # Node.js backend
-│   ├── classifier/
-│   │   └── classifier.js      # NLP Bayes Classifier
 │   ├── config/
-│   │   └── database.js        # MongoDB connection
+│   │   ├── database.js        # MongoDB connection
+│   │   └── googleAuth.js      # Google OAuth2 configuration
+│   ├── data/
+│   │   └── classifier.json    # Persistent trained model
 │   ├── models/
 │   │   └── Email.js           # Email schema
 │   ├── routes/
 │   │   └── emailRoutes.js     # API routes
 │   ├── services/
-│   │   └── gmailService.js    # Gmail API integration
+│   │   ├── gmailService.js    # Gmail API integration
+│   │   └── classifier.js      # NLP Bayes Classifier logic
 │   ├── server.js              # Main server file
 │   ├── seed.js                # Training data script
 │   └── package.json
@@ -147,6 +149,14 @@ Email catagariser/
 ├── package.json               # Root package.json
 └── README.md
 ```
+
+## 🛡️ Security Note
+
+This application follows modern security best practices:
+- **OAuth2 Protocol**: Instead of asking for your Gmail password, the app uses Google's secure OAuth2 protocol.
+- **Read-Only Access**: The `https://www.googleapis.com/auth/gmail.readonly` scope ensures the app can only read your emails and cannot send or delete them.
+- **Environment Isolation**: All sensitive credentials (API keys, DB passwords) are stored in `.env` files and are excluded from version control via `.gitignore`.
+- **Credential Masking**: A `.env.example` template is provided to safely document required variables without exposing real data.
 
 ## 🔌 API Endpoints
 
