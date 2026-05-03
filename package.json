@@ -6,6 +6,7 @@
     "scripts": {
         "install-all": "npm install && cd server && npm install && cd ../client && npm install",
         "server": "cd server && npm start",
+        "seed": "npm run server:seed",
         "server:dev": "cd server && npm run dev",
         "server:seed": "cd server && npm run seed",
         "client": "cd client && npm start",

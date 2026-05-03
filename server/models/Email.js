@@ -93,7 +93,6 @@ const EmailSchema = new mongoose.Schema({
 // Index for efficient querying by received date
 EmailSchema.index({ receivedAt: -1 });
 EmailSchema.index({ category: 1 });
-EmailSchema.index({ gmailId: 1 });
 
 // Static method to find recent emails
 EmailSchema.statics.findRecent = function (limit = 20) {
