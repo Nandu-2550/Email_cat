@@ -18,6 +18,27 @@ function App() {
     });
 
     useEffect(() => {
+        // Fetch existing emails
+        const fetchInitialData = async () => {
+            try {
+                const response = await fetch(`${SOCKET_URL}/api/emails`);
+                const result = await response.json();
+                if (result.success) {
+                    setEmails(result.data);
+                }
+
+                const statsResponse = await fetch(`${SOCKET_URL}/api/emails/stats`);
+                const statsResult = await statsResponse.json();
+                if (statsResult.success) {
+                    setCategoryStats(statsResult.data.categories);
+                }
+            } catch (error) {
+                console.error('Error fetching initial data:', error);
+            }
+        };
+
+        fetchInitialData();
+
         const socket = io(SOCKET_URL, {
             transports: ['websocket', 'polling'],
             reconnection: true,

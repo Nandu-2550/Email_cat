@@ -29,6 +29,9 @@ const io = new Server(server, {
     transports: ['websocket', 'polling']
 });
 
+// Store io in app for access in routes
+app.set('io', io);
+
 // Configuration
 const PORT = process.env.PORT || 5000;
 const POLL_INTERVAL = parseInt(process.env.GMAIL_POLL_INTERVAL) || 60000; // 60 seconds default
@@ -78,7 +81,8 @@ app.get('/', (req, res) => {
         endpoints: {
             health: '/api/health',
             emails: '/api/emails',
-            stats: '/api/emails/stats'
+            stats: '/api/emails/stats',
+            test: '/api/emails/test-broadcast'
         }
     });
 });

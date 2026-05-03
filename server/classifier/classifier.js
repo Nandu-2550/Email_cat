@@ -108,21 +108,29 @@ const getClassifier = () => classifier;
  * Check if classifier is trained
  */
 const isTrained = () => {
-    return classifier !== null && classifier.docs && classifier.docs.length > 0;
+    return !!classifier && classifier.docs && classifier.docs.length > 0;
 };
 
 /**
  * Save classifier to a file (optional persistence)
  */
-const saveClassifier = async (filename = './server/classifier/classifier.json') => {
+const saveClassifier = async (filename = './classifier/classifier.json') => {
     if (!classifier) return false;
 
     try {
-        await classifier.save(filename);
-        console.log(`Classifier saved to ${filename}`);
-        return true;
+        return new Promise((resolve, reject) => {
+            classifier.save(filename, (err) => {
+                if (err) {
+                    console.error('Error saving classifier:', err);
+                    resolve(false);
+                    return;
+                }
+                console.log(`Classifier saved to ${filename}`);
+                resolve(true);
+            });
+        });
     } catch (error) {
-        console.error('Error saving classifier:', error);
+        console.error('Unexpected error saving classifier:', error);
         return false;
     }
 };
@@ -130,14 +138,22 @@ const saveClassifier = async (filename = './server/classifier/classifier.json') 
 /**
  * Load classifier from a file (optional persistence)
  */
-const loadClassifier = async (filename = './server/classifier/classifier.json') => {
+const loadClassifier = async (filename = './classifier/classifier.json') => {
     try {
-        classifier = await natural.BayesClassifier.load(filename, null, () => {
-            console.log(`Classifier loaded from ${filename}`);
+        return new Promise((resolve, reject) => {
+            natural.BayesClassifier.load(filename, null, (err, loadedClassifier) => {
+                if (err) {
+                    console.log(`Could not load classifier from ${filename}: ${err.message}`);
+                    resolve(false);
+                    return;
+                }
+                classifier = loadedClassifier;
+                console.log(`Classifier loaded from ${filename}`);
+                resolve(true);
+            });
         });
-        return true;
     } catch (error) {
-        console.log(`Could not load classifier from ${filename}: ${error.message}`);
+        console.log(`Unexpected error loading classifier: ${error.message}`);
         return false;
     }
 };

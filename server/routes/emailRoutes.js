@@ -3,6 +3,47 @@ const router = express.Router();
 const Email = require('../models/Email');
 
 /**
+ * GET /api/emails/test-broadcast
+ * Test endpoint to trigger real-time broadcast
+ * This is before /:id to avoid being captured as an ID
+ */
+router.get('/test-broadcast', async (req, res) => {
+    try {
+        const testEmailData = {
+            gmailId: 'test_' + Date.now(),
+            from: 'test-bot@livemail.com',
+            to: 'nandunusgavai@gmail.com',
+            subject: '🚀 Persistent Test SUCCESS!',
+            content: 'This email is now saved in your database, so it will not disappear when you refresh!',
+            snippet: 'This email is now saved in your database...',
+            category: 'Business',
+            confidence: 0.95,
+            receivedAt: new Date(),
+            processedAt: new Date()
+        };
+        
+        // Save to Database
+        const savedEmail = await Email.create(testEmailData);
+        
+        // Access io from the app instance
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('new-email', {
+                ...savedEmail.toObject(),
+                id: savedEmail._id,
+                timestamp: savedEmail.receivedAt
+            });
+            res.json({ success: true, message: 'Test email saved and broadcasted!' });
+        } else {
+            res.status(500).json({ success: false, error: 'Socket.io not initialized' });
+        }
+    } catch (error) {
+        console.error('Test broadcast error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * GET /api/emails
  * Fetch recent emails with optional filters
  */
