@@ -1,52 +1,41 @@
 const { google } = require('googleapis');
 const { simpleParser } = require('mailparser');
 const Email = require('../models/Email');
+const User = require('../models/User');
 const { classifyEmail } = require('./classifier');
-const { getOAuth2Client } = require('../config/googleAuth');
-
-// Gmail API scopes
-const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-
-// OAuth2 client
-let oauth2Client = null;
-let gmail = null;
 
 /**
- * Initialize the Gmail API client
+ * Get an authorized Gmail client for a specific user
+ * @param {Object} user - User document from DB
+ * @returns {Object} - Gmail API instance
  */
-const initializeGmailClient = () => {
-    oauth2Client = getOAuth2Client();
+const getGmailClient = (user) => {
+    const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } = process.env;
 
-    if (!oauth2Client) {
-        console.warn('Gmail API credentials not configured. Running in demo mode.');
-        return false;
-    }
+    const oauth2Client = new google.auth.OAuth2(
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET,
+        GOOGLE_REDIRECT_URI || 'http://localhost:5000/oauth2callback'
+    );
 
-    gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-    console.log('Gmail API client initialized');
-    return true;
+    oauth2Client.setCredentials({
+        access_token: user.accessToken,
+        refresh_token: user.refreshToken
+    });
+
+    return google.gmail({ version: 'v1', auth: oauth2Client });
 };
 
 /**
- * Fetch recent emails from Gmail
- * @param {number} maxResults - Maximum number of emails to fetch
- * @param {number} afterTimestamp - Unix timestamp to fetch emails after
- * @returns {Array} - Array of processed email objects
+ * Fetch recent emails from Gmail for a specific client
  */
-const fetchEmails = async (maxResults = 10, afterTimestamp = null) => {
-    if (!gmail) {
-        console.warn('Gmail client not initialized');
-        return [];
-    }
-
+const fetchEmails = async (gmail, maxResults = 10, afterTimestamp = null) => {
     try {
-        // Build query
         let query = '';
         if (afterTimestamp) {
             query = `after:${afterTimestamp}`;
         }
 
-        // Fetch message list
         const response = await gmail.users.messages.list({
             userId: 'me',
             maxResults: maxResults,
@@ -54,26 +43,20 @@ const fetchEmails = async (maxResults = 10, afterTimestamp = null) => {
         });
 
         const messages = response.data.messages || [];
-        console.log(`Fetched ${messages.length} messages from Gmail`);
-
-        // Fetch full message details
-        const emailPromises = messages.map(msg => fetchMessageDetails(msg.id));
+        const emailPromises = messages.map(msg => fetchMessageDetails(gmail, msg.id));
         const emailDetails = await Promise.all(emailPromises);
 
         return emailDetails.filter(email => email !== null);
-
     } catch (error) {
-        console.error('Error fetching emails from Gmail:', error.message);
+        console.error('Error fetching emails:', error.message);
         return [];
     }
 };
 
 /**
  * Fetch full message details and parse content
- * @param {string} messageId - Gmail message ID
- * @returns {Object|null} - Processed email object or null if error
  */
-const fetchMessageDetails = async (messageId) => {
+const fetchMessageDetails = async (gmail, messageId) => {
     try {
         const response = await gmail.users.messages.get({
             userId: 'me',
@@ -82,24 +65,16 @@ const fetchMessageDetails = async (messageId) => {
         });
 
         const rawMessage = response.data.raw;
-
-        // Decode the base64url encoded message
         const messageBuffer = Buffer.from(rawMessage, 'base64url');
-
-        // Parse the MIME message
         const parsed = await simpleParser(messageBuffer);
 
-        // Extract email content for classification
         const emailContent = [
             parsed.subject || '',
             parsed.text || '',
             parsed.from?.text || ''
-        ].join(' ').substring(0, 5000); // Limit length for classification
+        ].join(' ').substring(0, 5000);
 
-        // Classify the email
         const classification = classifyEmail(emailContent);
-
-        // Extract sender email address
         const fromEmail = parsed.from?.value?.[0]?.address || parsed.from?.text || 'Unknown';
 
         return {
@@ -120,7 +95,6 @@ const fetchMessageDetails = async (messageId) => {
             hasAttachments: parsed.attachments && parsed.attachments.length > 0,
             threadId: response.data.threadId || ''
         };
-
     } catch (error) {
         console.error(`Error processing message ${messageId}:`, error.message);
         return null;
@@ -128,144 +102,143 @@ const fetchMessageDetails = async (messageId) => {
 };
 
 /**
- * Get the last processed timestamp from the database
- * @returns {number} - Unix timestamp
+ * Process and save emails for a specific user
  */
-const getLastProcessedTimestamp = async () => {
-    try {
-        const lastEmail = await Email.findOne().sort({ receivedAt: -1 });
-        if (lastEmail) {
-            return Math.floor(lastEmail.receivedAt.getTime() / 1000);
-        }
-
-        // If no emails processed yet, get emails from last 24 hours
-        const yesterday = new Date();
-        yesterday.setHours(yesterday.getHours() - 24);
-        return Math.floor(yesterday.getTime() / 1000);
-    } catch (error) {
-        console.error('Error getting last processed timestamp:', error.message);
-        // Default to 1 hour ago
-        const oneHourAgo = new Date();
-        oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-        return Math.floor(oneHourAgo.getTime() / 1000);
-    }
-};
-
-/**
- * Process and save emails to the database
- * @param {Array} emails - Array of email objects
- * @returns {Array} - Array of newly saved emails
- */
-const processAndSaveEmails = async (emails) => {
+const processAndSaveEmails = async (userEmail, emails) => {
     const savedEmails = [];
-
     for (const email of emails) {
         try {
-            // Check if email already exists
-            const existing = await Email.findOne({ gmailId: email.gmailId });
-            if (existing) {
-                console.log(`Email ${email.gmailId} already exists, skipping`);
-                continue;
-            }
+            const existing = await Email.findOne({ userEmail, gmailId: email.gmailId });
+            if (existing) continue;
 
-            // Save new email
-            const saved = await Email.create(email);
+            const saved = await Email.create({ ...email, userEmail });
             savedEmails.push(saved);
-            console.log(`Saved email: ${email.subject}`);
         } catch (error) {
-            console.error(`Error saving email ${email.gmailId}:`, error.message);
+            console.error(`Error saving email for ${userEmail}:`, error.message);
         }
     }
-
     return savedEmails;
 };
 
 /**
- * Main polling function - fetches, processes, and returns new emails
+ * Poll for all users in the database
  */
-const pollAndProcessEmails = async () => {
-    // Check if Gmail is initialized
-    const isInitialized = initializeGmailClient();
-
-    if (!isInitialized) {
-        // Return demo data for testing
-        return generateDemoEmails();
-    }
-
+const pollAllUsers = async (io) => {
     try {
-        // Get last processed timestamp
-        const lastTimestamp = await getLastProcessedTimestamp();
+        const users = await User.find({ refreshToken: { $exists: true } });
+        console.log(`Polling emails for ${users.length} users...`);
 
-        // Fetch new emails
-        const emails = await fetchEmails(10, lastTimestamp);
+        for (const user of users) {
+            try {
+                const gmail = getGmailClient(user);
+                
+                // Get last processed timestamp for this specific user
+                const lastEmail = await Email.findOne({ userEmail: user.email }).sort({ receivedAt: -1 });
+                let lastTimestamp;
+                if (lastEmail) {
+                    lastTimestamp = Math.floor(lastEmail.receivedAt.getTime() / 1000);
+                } else {
+                    const yesterday = new Date();
+                    yesterday.setHours(yesterday.getHours() - 24);
+                    lastTimestamp = Math.floor(yesterday.getTime() / 1000);
+                }
 
-        if (emails.length === 0) {
-            console.log('No new emails found');
-            return [];
+                const newEmails = await fetchEmails(gmail, 10, lastTimestamp);
+                const savedEmails = await processAndSaveEmails(user.email, newEmails);
+
+                if (savedEmails.length > 0 && io) {
+                    savedEmails.forEach(email => {
+                        // Emit to user-specific room
+                        io.to(`user:${user.email}`).emit('new-email', email);
+                    });
+                }
+            } catch (userError) {
+                console.error(`Error polling for ${user.email}:`, userError.message);
+            }
         }
-
-        // Process and save emails
-        const savedEmails = await processAndSaveEmails(emails);
-
-        console.log(`Processed ${savedEmails.length} new emails`);
-        return savedEmails;
-
     } catch (error) {
-        console.error('Error in poll and process:', error.message);
-        return [];
+        console.error('Error in pollAllUsers:', error.message);
     }
 };
 
 /**
- * Generate demo emails for testing without Gmail API
+ * Send a new email
  */
-const generateDemoEmails = () => {
-    const demoEmails = [
-        {
-            gmailId: `demo_${Date.now()}_1`,
-            from: 'boss@company.com',
-            subject: 'Project Update - Q4 Goals',
-            content: 'Team, we need to finalize the Q4 goals by end of week. Please review the attached document and provide feedback.',
-            snippet: 'Team, we need to finalize the Q4 goals...',
-            category: 'Work',
-            confidence: 0.85,
-            receivedAt: new Date(),
-            processedAt: new Date()
-        },
-        {
-            gmailId: `demo_${Date.now()}_2`,
-            from: 'bank@notifications.com',
-            subject: 'Your Monthly Statement is Ready',
-            content: 'Your monthly bank statement for October is now available. Login to view your account details and recent transactions.',
-            snippet: 'Your monthly bank statement for October...',
-            category: 'Finance',
-            confidence: 0.92,
-            receivedAt: new Date(Date.now() - 60000),
-            processedAt: new Date()
-        },
-        {
-            gmailId: `demo_${Date.now()}_3`,
-            from: 'deals@shopping.com',
-            subject: 'Flash Sale - 50% Off Everything!',
-            content: 'Limited time offer! Get 50% off all products this weekend only. Use code FLASH50 at checkout. Free shipping on orders over $50.',
-            snippet: 'Limited time offer! Get 50% off all products...',
-            category: 'Promotion',
-            confidence: 0.95,
-            receivedAt: new Date(Date.now() - 120000),
-            processedAt: new Date()
-        }
-    ];
+const sendEmail = async (user, { to, subject, body }) => {
+    try {
+        const gmail = getGmailClient(user);
+        const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+        const messageParts = [
+            `From: ${user.displayName} <${user.email}>`,
+            `To: ${to}`,
+            `Content-Type: text/html; charset=utf-8`,
+            'MIME-Version: 1.0',
+            `Subject: ${utf8Subject}`,
+            '',
+            body,
+        ];
+        const message = messageParts.join('\n');
+        const encodedMessage = Buffer.from(message)
+            .toString('base64')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
 
-    console.log(`Generated ${demoEmails.length} demo emails`);
-    return demoEmails;
+        const res = await gmail.users.messages.send({
+            userId: 'me',
+            requestBody: { raw: encodedMessage }
+        });
+        return res.data;
+    } catch (error) {
+        console.error('Error sending email:', error.message);
+        throw error;
+    }
+};
+
+/**
+ * Reply to an existing email thread
+ */
+const replyToEmail = async (user, { to, subject, body, threadId, messageId }) => {
+    try {
+        const gmail = getGmailClient(user);
+        const utf8Subject = `=?utf-8?B?${Buffer.from(subject.startsWith('Re:') ? subject : 'Re: ' + subject).toString('base64')}?=`;
+        
+        const messageParts = [
+            `From: ${user.displayName} <${user.email}>`,
+            `To: ${to}`,
+            `Subject: ${utf8Subject}`,
+            `In-Reply-To: ${messageId}`,
+            `References: ${messageId}`,
+            `Content-Type: text/html; charset=utf-8`,
+            'MIME-Version: 1.0',
+            '',
+            body,
+        ];
+        const message = messageParts.join('\n');
+        const encodedMessage = Buffer.from(message)
+            .toString('base64')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+
+        const res = await gmail.users.messages.send({
+            userId: 'me',
+            requestBody: {
+                raw: encodedMessage,
+                threadId: threadId
+            }
+        });
+        return res.data;
+    } catch (error) {
+        console.error('Error replying to email:', error.message);
+        throw error;
+    }
 };
 
 module.exports = {
-    initializeGmailClient,
+    getGmailClient,
     fetchEmails,
-    fetchMessageDetails,
-    getLastProcessedTimestamp,
-    processAndSaveEmails,
-    pollAndProcessEmails,
-    generateDemoEmails
+    pollAllUsers,
+    sendEmail,
+    replyToEmail
 };

@@ -12,8 +12,12 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const { initializeClassifier, loadClassifier, isTrained } = require('./services/classifier');
-const { pollAndProcessEmails } = require('./services/gmailService');
+const { pollAllUsers } = require('./services/gmailService');
 const emailRoutes = require('./routes/emailRoutes');
+const authRoutes = require('./routes/authRoutes');
+const passport = require('./config/passport');
+const session = require('express-session');
+const MongoStore = require('connect-mongo').default;
 
 // Initialize Express app
 const app = express();
@@ -44,6 +48,22 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Sessions
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'livemail_secret_key',
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
+
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Request logging middleware
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -62,6 +82,7 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 // Routes
+app.use('/', authRoutes);
 app.use('/api/emails', emailRoutes);
 
 // Health check endpoint
@@ -100,12 +121,16 @@ app.use((err, req, res, next) => {
 io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
 
-    socket.on('disconnect', () => {
-        console.log(`Client disconnected: ${socket.id}`);
+    // Join a private room based on user email
+    socket.on('join-room', (userEmail) => {
+        if (userEmail) {
+            socket.join(`user:${userEmail}`);
+            console.log(`Socket ${socket.id} joined room: user:${userEmail}`);
+        }
     });
 
-    socket.on('error', (error) => {
-        console.error(`Socket error for ${socket.id}:`, error);
+    socket.on('disconnect', () => {
+        console.log(`Client disconnected: ${socket.id}`);
     });
 });
 
@@ -140,19 +165,7 @@ const startPolling = () => {
 
 const performPoll = async () => {
     try {
-        console.log('Running email poll...');
-        const newEmails = await pollAndProcessEmails();
-
-        if (newEmails.length > 0) {
-            console.log(`Found ${newEmails.length} new emails`);
-
-            // Broadcast each new email to connected clients
-            for (const email of newEmails) {
-                broadcastNewEmail(email);
-            }
-        } else {
-            console.log('No new emails found');
-        }
+        await pollAllUsers(io);
     } catch (error) {
         console.error('Error during polling:', error);
     }

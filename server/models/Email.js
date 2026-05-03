@@ -1,11 +1,17 @@
 const mongoose = require('mongoose');
 
 const EmailSchema = new mongoose.Schema({
+    // Owner of the email
+    userEmail: {
+        type: String,
+        required: true,
+        index: true
+    },
+
     // Gmail message ID
     gmailId: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
 
     // Email headers
@@ -90,8 +96,12 @@ const EmailSchema = new mongoose.Schema({
     timestamps: true
 });
 
+// Compound index for unique emails per user
+EmailSchema.index({ userEmail: 1, gmailId: 1 }, { unique: true });
+
 // Index for efficient querying by received date
 EmailSchema.index({ receivedAt: -1 });
+EmailSchema.index({ userEmail: 1, receivedAt: -1 });
 EmailSchema.index({ category: 1 });
 
 // Static method to find recent emails

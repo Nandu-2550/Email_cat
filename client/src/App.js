@@ -1,92 +1,46 @@
-import React, { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import './index.css';
 
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+const ProtectedRoute = ({ children }) => {
+    const { user, loading } = useAuth();
+    
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+        );
+    }
+    
+    if (!user) {
+        return <Navigate to="/" />;
+    }
+    
+    return children;
+};
 
 function App() {
-    const [emails, setEmails] = useState([]);
-    const [isConnected, setIsConnected] = useState(false);
-    const [categoryStats, setCategoryStats] = useState({
-        Personal: 0,
-        Business: 0,
-        Finance: 0,
-        Security: 0,
-        Work: 0,
-        'College/School': 0,
-        Promotion: 0
-    });
-
-    useEffect(() => {
-        // Fetch existing emails
-        const fetchInitialData = async () => {
-            try {
-                const response = await fetch(`${SOCKET_URL}/api/emails`);
-                const result = await response.json();
-                if (result.success) {
-                    setEmails(result.data);
-                }
-
-                const statsResponse = await fetch(`${SOCKET_URL}/api/emails/stats`);
-                const statsResult = await statsResponse.json();
-                if (statsResult.success) {
-                    setCategoryStats(statsResult.data.categories);
-                }
-            } catch (error) {
-                console.error('Error fetching initial data:', error);
-            }
-        };
-
-        fetchInitialData();
-
-        const socket = io(SOCKET_URL, {
-            transports: ['websocket', 'polling'],
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 10
-        });
-
-        socket.on('connect', () => {
-            console.log('Connected to LiveMail server');
-            setIsConnected(true);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('Disconnected from LiveMail server');
-            setIsConnected(false);
-        });
-
-        // Listen for new categorized emails
-        socket.on('new-email', (emailData) => {
-            console.log('New email received:', emailData);
-
-            setEmails(prev => [emailData, ...prev]);
-
-            // Update category statistics
-            setCategoryStats(prev => ({
-                ...prev,
-                [emailData.category]: prev[emailData.category] + 1
-            }));
-        });
-
-        // Error handling
-        socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-        });
-
-        return () => {
-            socket.disconnect();
-        };
-    }, []);
-
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Dashboard
-                emails={emails}
-                isConnected={isConnected}
-                categoryStats={categoryStats}
-            />
-        </div>
+        <AuthProvider>
+            <div className="min-h-screen bg-black">
+                <Routes>
+                    <Route path="/" element={<Login />} />
+                    <Route 
+                        path="/dashboard" 
+                        element={
+                            <ProtectedRoute>
+                                <Dashboard />
+                            </ProtectedRoute>
+                        } 
+                    />
+                    <Route path="*" element={<Navigate to="/" />} />
+                </Routes>
+            </div>
+        </AuthProvider>
     );
 }
 
