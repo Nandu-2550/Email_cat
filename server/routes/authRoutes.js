@@ -13,7 +13,7 @@ router.get('/auth/google', passport.authenticate('google', {
         'https://www.googleapis.com/auth/gmail.modify'
     ],
     accessType: 'offline',
-    prompt: 'consent' // Forces Google to provide a refresh token
+    prompt: 'select_account consent' // Forces Google to show account picker and provide a refresh token
 }));
 
 // @desc    Google auth callback
