@@ -12,7 +12,7 @@ async function checkConnectedAccount() {
     const oauth2Client = new google.auth.OAuth2(
         GOOGLE_CLIENT_ID,
         GOOGLE_CLIENT_SECRET,
-        'http://localhost:5000/oauth2callback'
+        process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/oauth2callback'
     );
 
     oauth2Client.setCredentials({

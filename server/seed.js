@@ -5,7 +5,8 @@
  */
 
 require('dotenv').config({ path: '.env' });
-const { initializeClassifier, trainClassifier, saveClassifier } = require('./classifier/classifier');
+const connectDB = require('./config/database');
+const { initializeClassifier, trainClassifier, saveClassifier } = require('./services/classifier');
 
 // Training data for all 7 categories
 const trainingData = [
@@ -449,6 +450,10 @@ const seed = async () => {
     console.log('🌱 Starting LiveMail Classifier seed...');
 
     try {
+        // Connect to MongoDB
+        await connectDB();
+        console.log('✅ Database connected');
+
         // Initialize the classifier
         initializeClassifier();
         console.log('✅ Classifier initialized');
